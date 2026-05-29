@@ -3,8 +3,6 @@ import { createRequire } from 'node:module';
 import process from 'node:process';
 import { printBanner } from './utils/banner.js';
 import { runInit } from './commands/init.js';
-import { runScan } from './commands/scan.js';
-import { runApply } from './commands/apply.js';
 import { runList } from './commands/list.js';
 import { runRestore } from './commands/restore.js';
 
@@ -25,29 +23,11 @@ program
 
 program
   .command('init')
-  .description('初始化 ACOR：建立 .acor/ 目錄結構與 Claude adapter')
+  .description('初始化 ACOR：建立 .acor/ 結構、同步 skill 庫、安裝 /acor-scan 與 /acor-apply')
   .option('--cwd <path>', '目標專案根目錄', process.cwd())
+  .option('--force', '強制重新初始化（覆寫現有 .acor/）', false)
   .action(async (opts) => {
-    await runInit({ cwd: opts.cwd });
-  });
-
-program
-  .command('scan')
-  .description('掃描專案與現有 Claude 設定，輸出推薦 skills / rules 與衝突報告')
-  .option('--cwd <path>', '目標專案根目錄', process.cwd())
-  .option('--json', '以 JSON 格式輸出結果', false)
-  .action(async (opts) => {
-    await runScan({ cwd: opts.cwd, json: opts.json });
-  });
-
-program
-  .command('apply')
-  .description('互動式套用推薦 skills / rules，並選擇性封存現有項目')
-  .option('--cwd <path>', '目標專案根目錄', process.cwd())
-  .option('-y, --yes', '跳過互動式提問，套用所有推薦', false)
-  .option('--force', '覆寫已存在的檔案', false)
-  .action(async (opts) => {
-    await runApply({ cwd: opts.cwd, yes: opts.yes, force: opts.force });
+    await runInit({ cwd: opts.cwd, force: opts.force });
   });
 
 program
