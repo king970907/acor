@@ -8,7 +8,7 @@ description: 讀取 acor-scan 的推薦結果，互動選擇後將 skills / rule
 ## 核心限制（最高優先）
 
 - **Phase 5 之前禁止寫入任何檔案**，所有寫入必須等使用者確認
-- **只能寫入 catalog 內存在的 skill / rule**（從 `.acor/skills/` 或 `.acor/rules/` 讀取內容）
+- **只能寫入 catalog 內存在的 skill / rule**（從 `.acor/skills/` 或 `.acor/rules/` 讀取內容，不可自行產生）
 - **封存 = 移動到 `.acor/archive/`**，禁止直接刪除
 
 ---
@@ -187,7 +187,7 @@ mv .claude/rules/<relativePath> .acor/archive/rules/<relativePath>
 
 對每個選擇的 rule，從 `.acor/rules/<relativePath>` 讀取內容，寫入 `.claude/rules/<relativePath>`。
 
-若目標已存在 → 直接覆寫。
+若目標已存在 → 直接覆寫（不另行詢問，封存已是保護機制）。
 
 ### 5.4 更新 state.json
 
@@ -228,8 +228,5 @@ mv .claude/rules/<relativePath> .acor/archive/rules/<relativePath>
 
 ## Red Flags（禁止事項）
 
-- ❌ Phase 5 之前寫入任何檔案
-- ❌ 直接刪除現有 skill / rule（只能封存）
-- ❌ 寫入 `.acor/skills/` 以外不存在的 skill 內容（不可自行產生 skill 內容）
 - ❌ 封存後忘記更新 state.json
 - ❌ `autoMode` 時套用低信心推薦（除非明確傳入 `all --include-low`）
