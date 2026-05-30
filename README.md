@@ -39,6 +39,7 @@ Claude 做分析則不同：
 - 能讀任何語言的專案（Go、Python、Rust、Java…）
 - 能理解語意衝突，不是 regex 比對
 - 推薦理由有說明，不是黑盒子分數
+- **只從 catalog 推薦**，不憑空發明 skill 名稱
 
 ### 其他設計原則
 
@@ -49,6 +50,8 @@ Claude 做分析則不同：
 ---
 
 ## 安裝
+
+**需求：** Node.js >= 18.0.0
 
 ```bash
 git clone git@github.com:king970907/acor.git
@@ -73,12 +76,13 @@ npm install -g .
 ## 使用流程
 
 ```
-acor init           ← 一次性設定（建目錄 + 同步 skill 庫 + 安裝 Claude skills）
+acor init                ← 一次性設定（建目錄 + 同步 skill 庫 + 安裝 Claude skills）
      ↓
 在 Claude Code 中：
-/acor-scan          ← Claude 分析專案、偵測衝突、推薦 skills / rules
+/acor-scan               ← Claude 分析專案、偵測衝突、推薦 skills / rules
      ↓
-/acor-apply         ← Claude 互動選擇，確認後套用到 .claude/
+/acor-apply              ← Claude 互動選擇，確認後套用到 .claude/
+/acor-apply all          ← 快速模式：跳過所有詢問，直接套用高信心推薦
 ```
 
 之後若有新增 skills 或更新 ACOR，重新執行 `acor init --force` 即可。
@@ -188,6 +192,10 @@ Phase 5：輸出結果 + 寫入 .acor/core/last-scan.json
 
 **證據驅動：** 每個推薦必須列出具體依據，信心不足時詢問使用者而非猜測。
 
+**高信心 vs 低信心：**
+- 高信心：命中 2 個以上明確 trigger（如 `package.json` 包含 `vue` + devDeps 有 `typescript`）
+- 低信心：只命中 1 個 trigger，會在清單中標示供使用者判斷
+
 ---
 
 ### `/acor-apply`
@@ -196,10 +204,19 @@ Claude 執行的互動式套用 skill：
 
 1. 讀取 `/acor-scan` 產生的 `last-scan.json`（超過 30 分鐘提示重新 scan）
 2. 顯示衝突警告，讓使用者決定是否繼續
-3. 互動選擇要套用的 skills / rules
+3. 互動選擇要套用的 skills / rules（AskUserQuestion UI）
 4. 互動選擇要封存的現有項目
 5. **確認摘要後才寫入任何檔案**
 6. 寫入 `.claude/`、執行封存、更新 `state.json`
+
+**互動次數對照：**
+
+| 情境 | 互動次數 |
+|------|---------|
+| `/acor-apply all` | 0 次（全自動，套用所有高信心推薦） |
+| 選「套用高信心推薦」+ 無封存建議 | 2 次 |
+| 選「套用高信心推薦」+ 有封存建議 | 3 次 |
+| 手動選擇 skills + rules + 封存 | 最多 5 次 |
 
 ---
 
