@@ -1,6 +1,8 @@
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 import type { AcorState } from '../types/index.js';
 import { readJsonFile, writeJsonFile } from '../utils/fs.js';
-import { getStateFile } from '../utils/paths.js';
+import { getStateFile, getAcorArchiveDir } from '../utils/paths.js';
 
 const CURRENT_VERSION = '0.1.0';
 
@@ -41,4 +43,27 @@ export async function markArchived(
   state.installedSkills = state.installedSkills.filter((s) => s !== name);
   state.installedRules = state.installedRules.filter((r) => r !== name);
   await saveState(cwd, state);
+}
+
+export async function countArchived(cwd: string): Promise<number> {
+  const archiveDir = getAcorArchiveDir(cwd);
+
+  const [skillCount, ruleCount] = await Promise.all([
+    fs.readdir(path.join(archiveDir, 'skills'), { withFileTypes: true })
+      .then((entries) => entries.filter((e) => e.isDirectory()).length)
+      .catch(() => 0),
+    countFilesRecursive(path.join(archiveDir, 'rules')).catch(() => 0),
+  ]);
+
+  return skillCount + ruleCount;
+}
+
+async function countFilesRecursive(dir: string): Promise<number> {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const counts = await Promise.all(
+    entries.map((e) =>
+      e.isFile() ? Promise.resolve(1) : countFilesRecursive(path.join(dir, e.name)),
+    ),
+  );
+  return counts.reduce((a, b) => a + b, 0);
 }

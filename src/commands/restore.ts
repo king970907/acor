@@ -3,6 +3,7 @@ import path from 'node:path';
 import prompts from 'prompts';
 import kleur from 'kleur';
 import { log } from '../utils/logger.js';
+import { formatDate } from '../utils/format.js';
 import { fileExists, moveFile, ensureDir } from '../utils/fs.js';
 import {
   getAcorDir,
@@ -43,10 +44,7 @@ export async function runRestore(opts: RestoreOptions): Promise<void> {
   log.section(`封存項目（${items.length}）`);
   for (const item of items) {
     const typeLabel = item.type === 'skill' ? kleur.cyan('[skill]') : kleur.blue('[rule] ');
-    const date = new Date(item.archivedAt).toLocaleString('zh-TW', {
-      month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit',
-    });
+    const date = formatDate(item.archivedAt);
     console.log(`  ${typeLabel} ${item.name.padEnd(30)} ${kleur.dim('封存於 ' + date)}`);
   }
 

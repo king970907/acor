@@ -5,6 +5,7 @@ import { printBanner } from './utils/banner.js';
 import { runInit } from './commands/init.js';
 import { runList } from './commands/list.js';
 import { runRestore } from './commands/restore.js';
+import { runStatus } from './commands/status.js';
 
 const loadPkg = createRequire(import.meta.url);
 const { version: VERSION } = loadPkg('../package.json') as { version: string };
@@ -36,6 +37,14 @@ program
   .option('--cwd <path>', '目標專案根目錄（用於顯示安裝狀態）', process.cwd())
   .action(async (opts) => {
     await runList({ cwd: opts.cwd });
+  });
+
+program
+  .command('status')
+  .description('顯示 ACOR 當前狀態：已安裝項目、上次掃描結果、封存清單')
+  .option('--cwd <path>', '目標專案根目錄', process.cwd())
+  .action(async (opts) => {
+    await runStatus({ cwd: opts.cwd });
   });
 
 program

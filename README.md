@@ -153,6 +153,37 @@ acor list --cwd /path/to/project
 
 ---
 
+### `acor status`
+
+顯示當前專案的 ACOR 狀態：已安裝項目、上次掃描摘要、封存清單。
+
+```bash
+acor status
+acor status --cwd /path/to/project
+```
+
+範例輸出：
+
+```
+ACOR 狀態
+  專案：/path/to/my-project
+
+已安裝（2 skills，2 rules）
+  Skills：typescript-strict, vue-patterns
+  Rules： typescript.md, testing.md
+
+上次掃描
+  時間：05/29 21:34（2 小時前）
+  專案：typescript / nuxt / web，含測試
+  衝突：無
+  推薦：1 項（1 高信心）
+
+封存
+  （無）
+```
+
+---
+
 ### `acor restore`
 
 從 `.acor/archive/` 還原封存的 skills 或 rules（由 `/acor-apply` 封存的項目）。
@@ -229,6 +260,10 @@ Claude 執行的互動式套用 skill：
 | `react-patterns` | React / Next.js Patterns | `framework: react/next` / `dep: react` |
 | `testing-vitest` | Testing with Vitest | `devDep: vitest` |
 | `node-api` | Node.js API Patterns | `framework: express/fastify/hono` |
+| `python-patterns` | Python Patterns | `language: python` / `file: pyproject.toml` |
+| `go-patterns` | Go Patterns | `language: go` / `file: go.mod` |
+| `rust-patterns` | Rust Patterns | `language: rust` / `file: Cargo.toml` |
+| `java-spring` | Java / Spring Boot Patterns | `language: java` / `file: pom.xml` |
 
 ## 內建 Rules
 
@@ -237,6 +272,8 @@ Claude 執行的互動式套用 skill：
 | `typescript` | TypeScript 慣例 | `language: typescript` |
 | `testing` | 測試規範 | `devDep: vitest / jest` |
 | `node-security` | Node.js 安全規範 | `projectType: api` / `framework: express/fastify/hono` |
+| `python` | Python 慣例 | `language: python` |
+| `go` | Go 慣例 | `language: go` |
 
 ---
 
@@ -294,10 +331,11 @@ acor init --force --cwd /your/project
 ```
 acor/
   src/
-    cli.ts                  # Commander 入口（init / list / restore）
+    cli.ts                  # Commander 入口（init / list / status / restore）
     commands/
       init.ts               # 同步 skill 庫、產生 catalog、安裝 ACOR skills
       list.ts               # 讀 catalog.json 顯示清單與安裝狀態
+      status.ts             # 顯示已安裝項目、掃描結果、封存清單
       restore.ts            # 從 .acor/archive/ 還原封存項目
     core/
       state.ts              # state.json 讀寫

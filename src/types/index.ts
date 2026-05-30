@@ -35,3 +35,15 @@ export interface AcorState {
   installedRules: string[]
   archivedAt: Record<string, string>
 }
+
+export interface LastScan {
+  scannedAt: string
+  project: {
+    language: string
+    framework: string
+    projectType: string
+    hasTesting: boolean
+  }
+  conflicts: Array<{ description: string; items: string[] }>
+  recommendations: Array<{ type: string; id: string; confidence: string }>
+}

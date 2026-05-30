@@ -42,6 +42,10 @@ export function getStateFile(cwd: string): string {
   return path.join(cwd, '.acor', 'core', 'state.json');
 }
 
+export function getLastScanFile(cwd: string): string {
+  return path.join(cwd, '.acor', 'core', 'last-scan.json');
+}
+
 // .claude/ 目錄
 export function getClaudeDir(cwd: string): string {
   return path.join(cwd, '.claude');

@@ -26,7 +26,7 @@ npm install -g .         # 重新安裝全域指令（改完 src/ 或 assets/ �
 
 ### 入口
 
-- **`src/cli.ts`** — Commander 進入點，定義 `init / list / restore` 三個子指令
+- **`src/cli.ts`** — Commander 進入點，定義 `init / list / status / restore` 四個子指令
 
 ### Commands（`src/commands/`）
 
@@ -34,6 +34,7 @@ npm install -g .         # 重新安裝全域指令（改完 src/ 或 assets/ �
 |------|------|------|
 | `init.ts` | `acor init` | 建立 `.acor/` 目錄結構、同步 skill/rule 庫、產生 catalog、安裝 ACOR skills 到 `.claude/skills/` |
 | `list.ts` | `acor list` | 讀 catalog.json 與 state.json，顯示所有 skills/rules 及安裝狀態 |
+| `status.ts` | `acor status` | 顯示已安裝項目、上次掃描摘要、封存清單 |
 | `restore.ts` | `acor restore` | 掃描 `.acor/archive/`，互動選擇後還原到 `.claude/` |
 
 ### Claude Skills（`assets/acor-skills/`）
