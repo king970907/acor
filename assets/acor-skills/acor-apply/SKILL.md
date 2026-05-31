@@ -1,15 +1,15 @@
 ---
 name: acor-apply
-description: 讀取 /acor-scan 的衝突報告，逐一處理衝突：修改、合併或移除衝突內容，並提出優化建議。所有修改需使用者確認後才執行。
+description: 讀取 /acor-scan 的衝突報告，逐一處理衝突：修改、合併或移除衝突內容。刪除 skill 時同步更新 acor.json。所有修改需使用者確認後才執行。
 ---
 
 # ACOR Apply — 衝突處理
 
 ## 核心原則
 
-- **所有修改需確認後才寫入**：Phase 4 之前不修改任何檔案
-- **保留使用者意圖**：修改時以「解決衝突」為目的，不重寫整個檔案
-- **提出選項，讓使用者決定**：不強制選擇
+- **Phase 4 確認前不修改任何檔案**
+- **刪除 skill 必須同步更新 `acor.json`**：否則下次 `acor init` 會重新安裝
+- **只處理衝突**：不推薦新增 skills 或 rules，那是使用者透過 `acor add` 決定的事
 
 ---
 
@@ -18,54 +18,51 @@ description: 讀取 /acor-scan 的衝突報告，逐一處理衝突：修改、�
 讀取 `.acor/core/last-scan.json`。
 
 - 不存在 → 停止並提示：「請先執行 `/acor-scan`」
-- `scannedAt` 超過 60 分鐘 → 警告過期，建議重新掃描（使用者可選擇繼續）
-- `conflicts` 為空 → 顯示「無衝突，環境配置良好」，進入 Phase 3（優化建議）
+- `scannedAt` 超過 60 分鐘 → 警告：掃描結果可能過期，建議重新執行（使用者可選擇繼續）
+- `conflicts` 為空 → 顯示「無衝突，環境配置良好」，結束
 
 ---
 
-## Phase 2：處理衝突
+## Phase 2：逐一處理衝突
 
-對每個衝突逐一處理：
-
-### 顯示衝突詳情
+對每個衝突顯示詳情並提供選項（AskUserQuestion 單選）：
 
 ```
 ⚠ 衝突 1/N：[類型]
-  <衝突描述>
+  <描述>
   <引用的衝突原文>
 ```
 
-### 提供解決選項（AskUserQuestion 單選）
+### `rule-rule`（兩個 rules 矛盾）
 
-根據衝突類型提供對應選項：
-
-**rule-rule 衝突（如縮排設定矛盾）：**
+選項：
 - 以 A 為準，修改 B 使其一致
 - 以 B 為準，修改 A 使其一致
 - 合併：移除重複，保留統一規定
-- 略過此衝突
+- 略過
 
-**skill-skill 衝突（如 react + vue 同時安裝）：**
-- 移除 skill A（從 .claude/skills/ 刪除）
-- 移除 skill B（從 .claude/skills/ 刪除）
+### `skill-skill`（兩個 skills 互斥）
+
+選項：
+- 移除 skill A（從 `.claude/skills/` 刪除，並從 `acor.json` 移除）
+- 移除 skill B（從 `.claude/skills/` 刪除，並從 `acor.json` 移除）
 - 兩個都保留（略過）
 
-**skill-rule 衝突：**
-- 以 skill 為準，修改 rule
-- 以 rule 為準，修改 skill
-- 略過此衝突
+### `skill-rule`（skill 與 rule 矛盾）
+
+選項：
+- 以 skill 為準，修改 rule 使其一致
+- 以 rule 為準，修改 skill 使其一致
+- 略過
 
 ---
 
 ## Phase 3：優化建議（選填）
 
-衝突處理完成後，若有以下情況可提出建議（不強制執行）：
+衝突全部處理後，若有以下情況用文字提出建議，**不自動執行**：
 
-- 多個 rules 有**重疊但不衝突**的內容 → 建議合併精簡
-- 某個 skill 的規範已被 rule 完整覆蓋 → 建議移除重複
-- 發現明顯缺漏（如有 TypeScript skill 但沒有對應 rule）→ 提示可考慮新增
-
-用文字說明即可，不自動執行。
+- 多個 rules 有重疊但不衝突的內容 → 建議手動合併精簡
+- 某個 skill 的規範已被 rule 完整覆蓋 → 建議考慮移除其中一個
 
 ---
 
@@ -76,8 +73,8 @@ description: 讀取 /acor-scan 的衝突報告，逐一處理衝突：修改、�
 ```
 即將執行：
   修改 typescript.md — 將縮排改為 2 格
-  刪除 react-patterns skill
-  （略過 2 個衝突）
+  刪除 skill react-patterns（.claude/ 與 acor.json 同步）
+  略過 1 個衝突
 ```
 
 ### 最終確認（AskUserQuestion 單選）
@@ -90,9 +87,12 @@ description: 讀取 /acor-scan 的衝突報告，逐一處理衝突：修改、�
 
 取消 → 不修改任何檔案，結束。
 
-### 執行修改
+### 執行順序
 
-逐一修改或刪除對應檔案。
+1. 修改 rule 內容（Edit 工具，只改衝突的段落）
+2. 刪除 skill 目錄（`.claude/skills/<id>/`）
+3. **更新 `acor.json`**：從 `skills` 陣列移除對應 id
+4. 若有 rule 被刪除，同步從 `acor.json` 的 `rules` 陣列移除
 
 ---
 
@@ -103,7 +103,7 @@ description: 讀取 /acor-scan 的衝突報告，逐一處理衝突：修改、�
 
   已修改（N）：<列出檔案>
   已刪除（N）：<列出項目>
-  已略過（N）：<列出略過的衝突>
+  略過（N）：<列出略過的衝突>
 ```
 
 ---
@@ -111,5 +111,6 @@ description: 讀取 /acor-scan 的衝突報告，逐一處理衝突：修改、�
 ## Red Flags（禁止事項）
 
 - ❌ Phase 4 確認前修改或刪除任何檔案
-- ❌ 推薦安裝新的 skills（使用者用 `acor add` 自行決定）
-- ❌ 重寫整個 skill 或 rule 檔案（只修改衝突的部分）
+- ❌ 刪除 skill 但未同步更新 `acor.json`
+- ❌ 推薦安裝新的 skills 或 rules
+- ❌ 重寫整個 skill 或 rule 檔案（只修改衝突段落）
