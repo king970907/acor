@@ -54,7 +54,17 @@ function printLastScan(scan: LastScan | null): void {
   }
 
   log.info(`  時間：${formatDate(scan.scannedAt)}（${relativeTime(scan.scannedAt)}）`);
+  log.info(`  語言：${scan.project.languages.join(', ') || '未知'}　框架：${scan.project.frameworks.join(', ') || '未知'}`);
   log.info(`  已掃描：${scan.installedSkills.length} skills，${scan.installedRules.length} rules`);
+
+  if (scan.irrelevant.length > 0) {
+    log.info('  ' + kleur.yellow(`不相關：${scan.irrelevant.length} 項`));
+    for (const i of scan.irrelevant) {
+      log.dim(`    • [${i.type}] ${i.id}`);
+    }
+  } else {
+    log.dim('  不相關：無');
+  }
 
   if (scan.conflicts.length > 0) {
     log.info('  ' + kleur.yellow(`衝突：${scan.conflicts.length} 項`));

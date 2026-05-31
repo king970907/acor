@@ -1,19 +1,40 @@
 ---
 name: acor-scan
-description: 掃描當前專案已安裝的 skills 與 rules，分析內容衝突與矛盾，輸出衝突報告並寫入 .acor/core/last-scan.json，供 /acor-apply 使用。
+description: 掃描當前專案已安裝的 skills 與 rules，偵測不相關項目（語言/框架不符）與內容衝突，輸出報告並寫入 .acor/core/last-scan.json，供 /acor-apply 使用。
 ---
 
-# ACOR Scan — 衝突分析
+# ACOR Scan — 相關性與衝突分析
 
 ## 核心原則
 
 - **只分析已安裝的項目**：讀 `.claude/skills/` 和 `.claude/rules/`，不做推薦
-- **每個衝突必須有具體證據**：引用原文，不憑印象
-- **不讀程式碼區塊**：只分析說明文字與規範條文，跳過 ` ``` ` 區塊內的範例程式碼
+- **每個問題必須有具體依據**：引用原文或明確的技術特徵，不憑印象
+- **不讀程式碼區塊**：跳過 ` ``` ` 之間的範例程式碼，只分析說明文字與規範條目
 
 ---
 
-## Phase 1：建立已安裝清單
+## Phase 1：偵測專案語言與框架
+
+依序檢查以下檔案是否存在，**存在就讀取**（可能同時存在多個）：
+
+| 檔案 | 判斷內容 |
+|------|---------|
+| `package.json` | `dependencies` / `devDependencies` → 框架（vue, react, next, nuxt, express, fastify…）、語言（typescript） |
+| `go.mod` | → 語言：go |
+| `Cargo.toml` | → 語言：rust |
+| `pyproject.toml` / `requirements.txt` | → 語言：python |
+| `pom.xml` / `build.gradle` | → 語言：java |
+| `Package.swift` | → 語言：swift |
+
+整理出：
+```
+languages:  [typescript, ...]
+frameworks: [vue, nuxt, ...]
+```
+
+---
+
+## Phase 2：建立已安裝清單
 
 列出以下目錄的內容：
 
@@ -24,39 +45,67 @@ description: 掃描當前專案已安裝的 skills 與 rules，分析內容衝�
 
 ---
 
-## Phase 2：讀取內容
+## Phase 3：相關性檢查
 
-讀取每個 skill 的 `SKILL.md` 與每個 rule 的 `.md` 全文。
+讀取每個已安裝 skill 的 `SKILL.md` frontmatter，取得 `tags` 和 `triggers`。
 
-分析時**跳過程式碼區塊**（\`\`\` 之間的內容），只看說明文字與規範條目，避免把範例程式碼誤判為衝突。
+**判斷標準：**
+
+若 skill 的 tags 或 triggers 包含**明確的語言或框架識別詞**，但與 Phase 1 偵測到的結果不符，標記為「不相關」。
+
+常見的語言/框架識別詞：
+
+| 識別詞 | 屬於 |
+|--------|------|
+| `go`, `golang` | Go 語言 |
+| `rust` | Rust 語言 |
+| `python` | Python 語言 |
+| `java`, `spring` | Java 生態 |
+| `react`, `nextjs`, `next` | React 框架 |
+| `vue`, `nuxt` | Vue 框架 |
+| `swift` | Swift 語言 |
+
+**不標記為不相關的情況：**
+- tags 只有通用標籤：`testing`, `api`, `backend`, `security`（與語言無關）
+- skill 同時覆蓋多語言（如 `node-api` 支援 express/fastify/hono，屬通用）
+
+**rules 的相關性：**
+讀取 rule 的 frontmatter `triggers`，若 trigger 指定特定語言（如 `language: go`）但專案不是該語言，同樣標記為不相關。
 
 ---
 
-## Phase 3：分析衝突
+## Phase 4：衝突分析
+
+讀取所有已安裝 skill 和 rule 的全文，跳過程式碼區塊，分析說明文字。
 
 ### 衝突類型
 
 | 類型 | 說明 | 範例 |
 |------|------|------|
 | `rule-rule` | 兩個 rules 之間明確矛盾 | A 要求 2 格縮排，B 要求 4 格 |
-| `skill-skill` | 兩個 skills 語意重疊或互斥 | react-patterns + vue-patterns 同時存在 |
+| `skill-skill` | 兩個 skills 語意互斥 | react-patterns + vue-patterns 同時存在 |
 | `skill-rule` | skill 與 rule 之間矛盾 | skill 說用 tabs，rule 說用 spaces |
 
-### 判斷標準
-
-- **確認衝突**：找到針對同一件事的不同規定，有具體原文可引用
-- **疑似衝突**：語意上可能矛盾，但文字不夠明確，標記為疑似
-- **不報告**：風格偏好差異（如不同命名建議但不互相矛盾）
+**只報告有具體原文可引用的確認衝突**，風格偏好差異不報。
 
 ---
 
-## Phase 4：輸出報告
+## Phase 5：輸出報告
 
 ### 終端機輸出
 
 ```
-已安裝 Skills（N）：typescript-strict, vue-patterns
-已安裝 Rules（N）： typescript.md, testing.md
+專案偵測
+  語言：typescript
+  框架：vue, nuxt
+
+已安裝 Skills（N）：typescript-strict, vue-patterns, go-patterns
+已安裝 Rules（N）： typescript.md, go.md
+
+不相關項目
+  ⚠ [skill] go-patterns — tags: [go, backend]，與當前專案（vue/typescript）不符
+  ⚠ [rule]  go.md       — trigger: language: go，與當前專案不符
+  → 建議執行 `acor remove` 移除，或執行 `/acor-apply` 一併處理
 
 衝突分析
   無衝突
@@ -64,9 +113,6 @@ description: 掃描當前專案已安裝的 skills 與 rules，分析內容衝�
   ⚠ [rule-rule] typescript.md vs testing.md
       typescript.md：「使用 2 格縮排」
       testing.md：「使用 4 格縮排」
-
-  ⚠ [skill-skill] vue-patterns vs react-patterns
-      同時安裝兩個前端框架 patterns，建議只保留一個
 ```
 
 ### 寫入 `.acor/core/last-scan.json`
@@ -76,29 +122,36 @@ description: 掃描當前專案已安裝的 skills 與 rules，分析內容衝�
 ```json
 {
   "scannedAt": "<ISO timestamp>",
-  "installedSkills": ["typescript-strict", "vue-patterns"],
-  "installedRules": ["typescript.md", "testing.md"],
-  "conflicts": [
+  "project": {
+    "languages": ["typescript"],
+    "frameworks": ["vue", "nuxt"]
+  },
+  "installedSkills": ["typescript-strict", "vue-patterns", "go-patterns"],
+  "installedRules": ["typescript.md", "go.md"],
+  "irrelevant": [
     {
-      "type": "rule-rule",
-      "description": "縮排設定衝突：typescript.md（2格）vs testing.md（4格）",
-      "items": ["typescript.md", "testing.md"],
-      "evidence": {
-        "typescript.md": "使用 2 格縮排",
-        "testing.md": "使用 4 格縮排"
-      }
+      "type": "skill",
+      "id": "go-patterns",
+      "reason": "skill 標記為 [go, backend]，專案語言為 typescript / 框架為 vue"
+    },
+    {
+      "type": "rule",
+      "id": "go",
+      "reason": "trigger 指定 language: go，專案語言為 typescript"
     }
-  ]
+  ],
+  "conflicts": []
 }
 ```
 
-完成後提示：「掃描完成，執行 `/acor-apply` 處理衝突。」
+完成後提示：「掃描完成，執行 `/acor-apply` 處理問題。」
 
 ---
 
 ## Red Flags（禁止事項）
 
 - ❌ 推薦安裝新的 skills 或 rules
+- ❌ 把通用標籤（testing、api、security）的 skill 標記為不相關
 - ❌ 把程式碼區塊內容誤判為衝突規範
-- ❌ 沒有具體引用原文就宣告衝突
+- ❌ 沒有具體依據就宣告衝突或不相關
 - ❌ 未寫入 last-scan.json 就結束

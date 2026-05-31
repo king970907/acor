@@ -32,8 +32,17 @@ export interface HubRule {
 // /acor-scan 的結果快取
 export interface LastScan {
   scannedAt: string
+  project: {
+    languages: string[]
+    frameworks: string[]
+  }
   installedSkills: string[]
   installedRules: string[]
+  irrelevant: Array<{
+    type: 'skill' | 'rule'
+    id: string
+    reason: string
+  }>
   conflicts: Array<{
     type: 'skill-skill' | 'rule-rule' | 'skill-rule'
     description: string
