@@ -78,7 +78,7 @@ tags 或 triggers 包含明確語言/框架識別詞，且與專案不符。
 
 原因：不相關的 skill 內容不應被納入衝突分析，移除後環境才是正確的基線。
 
-輸出後提示：「請執行 `/acor-apply` 移除不相關項目，完成後重新執行 `/acor-scan`」
+寫入 `last-scan.json`（`conflicts` 為空陣列），輸出後提示：「請執行 `/acor-apply` 移除不相關項目，完成後重新執行 `/acor-scan`」
 
 ---
 
@@ -100,14 +100,15 @@ tags 或 triggers 包含明確語言/框架識別詞，且與專案不符。
 
 ## Phase 5：輸出報告
 
-### 終端機輸出
+### 情境 A：發現不相關項目（已觸發 Early Exit）
 
+終端機輸出：
 ```
 專案偵測
   語言：typescript　框架：vue, nuxt
 
-已安裝 Skills（N）：typescript-strict, vue-patterns, go-patterns
-已安裝 Rules（N）： typescript.md, go.md
+已安裝 Skills（3）：typescript-strict, vue-patterns, go-patterns
+已安裝 Rules（2）： typescript.md, go.md
 
 不相關項目（已停止衝突分析）
   ⚠ [skill] go-patterns — tags: [go]，與當前專案不符
@@ -115,39 +116,47 @@ tags 或 triggers 包含明確語言/框架識別詞，且與專案不符。
   → 執行 /acor-apply 移除後重新 scan
 ```
 
-或全部相關時：
-
+寫入 `last-scan.json`：
+```json
+{
+  "scannedAt": "<ISO timestamp>",
+  "project": { "languages": ["typescript"], "frameworks": ["vue", "nuxt"] },
+  "installedSkills": ["typescript-strict", "vue-patterns", "go-patterns"],
+  "installedRules": ["typescript.md", "go.md"],
+  "irrelevant": [
+    { "type": "skill", "id": "go-patterns", "reason": "tags: [go]，專案為 typescript / vue" },
+    { "type": "rule",  "id": "go",          "reason": "trigger: language: go，專案語言為 typescript" }
+  ],
+  "conflicts": []
+}
 ```
-不相關項目：無，繼續衝突分析
+
+### 情境 B：全部相關，進行衝突分析
+
+終端機輸出：
+```
+專案偵測
+  語言：typescript　框架：vue, nuxt
+
+已安裝 Skills（2）：typescript-strict, vue-patterns
+已安裝 Rules（2）： typescript.md, testing.md
+
+不相關項目：無
 
 衝突分析
-  無衝突
-  或
   ⚠ [rule-rule] typescript.md vs testing.md
       typescript.md：「使用 2 格縮排」
       testing.md：「使用 4 格縮排」
 ```
 
-### 寫入 `.acor/core/last-scan.json`
-
-確認 `.acor/core/` 目錄存在後寫入：
-
+寫入 `last-scan.json`：
 ```json
 {
   "scannedAt": "<ISO timestamp>",
-  "project": {
-    "languages": ["typescript"],
-    "frameworks": ["vue", "nuxt"]
-  },
+  "project": { "languages": ["typescript"], "frameworks": ["vue", "nuxt"] },
   "installedSkills": ["typescript-strict", "vue-patterns"],
-  "installedRules": ["typescript.md"],
-  "irrelevant": [
-    {
-      "type": "skill",
-      "id": "go-patterns",
-      "reason": "tags: [go]，專案為 typescript / vue"
-    }
-  ],
+  "installedRules": ["typescript.md", "testing.md"],
+  "irrelevant": [],
   "conflicts": [
     {
       "type": "rule-rule",
@@ -169,6 +178,8 @@ tags 或 triggers 包含明確語言/框架識別詞，且與專案不符。
 ## Red Flags（禁止事項）
 
 - ❌ 有不相關項目仍繼續做衝突分析
+- ❌ `irrelevant` 非空時 `conflicts` 也寫入資料（Early Exit 後衝突欄位必須是 `[]`）
+- ❌ `installedSkills` / `installedRules` 遺漏任何已安裝的項目（含不相關的）
 - ❌ 同一個檔案開啟超過一次
 - ❌ 把通用標籤（testing、api、security）的 skill 標記為不相關
 - ❌ 把程式碼區塊內容誤判為衝突
