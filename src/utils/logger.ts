@@ -8,6 +8,4 @@ export const log = {
   step: (msg: string) => console.log(kleur.cyan('→ ') + msg),
   dim: (msg: string) => console.log(kleur.dim(msg)),
   section: (msg: string) => console.log('\n' + kleur.bold().underline(msg)),
-  conflict: (msg: string) => console.log(kleur.red('⚡ ') + msg),
-  recommendation: (msg: string) => console.log(kleur.magenta('★ ') + msg),
 };

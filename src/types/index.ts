@@ -35,8 +35,9 @@ export interface LastScan {
   installedSkills: string[]
   installedRules: string[]
   conflicts: Array<{
-    type: 'skill' | 'rule' | 'cross'
+    type: 'skill-skill' | 'rule-rule' | 'skill-rule'
     description: string
     items: string[]
+    evidence?: Record<string, string>
   }>
 }

@@ -4,17 +4,11 @@ import matter from 'gray-matter';
 import prompts from 'prompts';
 import kleur from 'kleur';
 import { log } from '../utils/logger.js';
-import { fileExists, readJsonFile, writeJsonFile, ensureDir } from '../utils/fs.js';
-import {
-  getAcorJsonFile,
-  getAcorDir,
-  getHubSkillsDir,
-  getHubRulesDir,
-  getClaudeSkillsDir,
-  getClaudeRulesDir,
-} from '../utils/paths.js';
+import { fileExists, readJsonFile, writeJsonFile } from '../utils/fs.js';
+import { getAcorJsonFile, getAcorDir, getHubSkillsDir, getHubRulesDir } from '../utils/paths.js';
 import { loadConfig } from '../utils/config.js';
 import { syncRegistry } from '../utils/registry.js';
+import { installSkill, installRule, removeSkill, removeRule } from '../utils/install.js';
 import type { AcorJson, HubSkill, HubRule, SkillTrigger } from '../types/index.js';
 
 export interface AddOptions {
@@ -133,8 +127,7 @@ export async function runAdd(opts: AddOptions): Promise<void> {
 
   // 執行安裝 / 移除
   log.step('套用變更');
-  await applySkills(cwd, hubPath, toAddSkills, toRemoveSkills);
-  await applyRules(cwd, hubPath, toAddRules, toRemoveRules);
+  await applyChanges(cwd, hubPath, toAddSkills, toRemoveSkills, toAddRules, toRemoveRules);
 
   // 更新 acor.json
   const updated: AcorJson = {
@@ -147,52 +140,26 @@ export async function runAdd(opts: AddOptions): Promise<void> {
   log.dim('  記得 git commit acor.json 讓團隊同步');
 }
 
-async function applySkills(
+async function applyChanges(
   cwd: string,
   hubPath: string,
-  toAdd: string[],
-  toRemove: string[],
+  toAddSkills: string[],
+  toRemoveSkills: string[],
+  toAddRules: string[],
+  toRemoveRules: string[],
 ): Promise<void> {
-  const skillsDir = getHubSkillsDir(hubPath);
-  const claudeSkillsDir = getClaudeSkillsDir(cwd);
-
-  for (const id of toAdd) {
-    const src = path.join(skillsDir, id, 'SKILL.md');
-    if (!await fileExists(src)) { log.warn(`  找不到 skill：${id}`); continue; }
-    const dest = path.join(claudeSkillsDir, id, 'SKILL.md');
-    await ensureDir(path.dirname(dest));
-    await fs.copyFile(src, dest);
-    log.success(`  安裝 skill：${id}`);
+  for (const id of toAddSkills) {
+    if (await installSkill(cwd, hubPath, id)) log.success(`  安裝 skill：${id}`);
   }
-
-  for (const id of toRemove) {
-    const dest = path.join(claudeSkillsDir, id);
-    await fs.rm(dest, { recursive: true, force: true });
+  for (const id of toRemoveSkills) {
+    await removeSkill(cwd, id);
     log.dim(`  移除 skill：${id}`);
   }
-}
-
-async function applyRules(
-  cwd: string,
-  hubPath: string,
-  toAdd: string[],
-  toRemove: string[],
-): Promise<void> {
-  const rulesDir = getHubRulesDir(hubPath);
-  const claudeRulesDir = getClaudeRulesDir(cwd);
-
-  for (const rel of toAdd) {
-    const src = path.join(rulesDir, rel);
-    if (!await fileExists(src)) { log.warn(`  找不到 rule：${rel}`); continue; }
-    const dest = path.join(claudeRulesDir, rel);
-    await ensureDir(path.dirname(dest));
-    await fs.copyFile(src, dest);
-    log.success(`  安裝 rule：${rel}`);
+  for (const rel of toAddRules) {
+    if (await installRule(cwd, hubPath, rel)) log.success(`  安裝 rule：${rel}`);
   }
-
-  for (const rel of toRemove) {
-    const dest = path.join(claudeRulesDir, rel);
-    await fs.rm(dest, { force: true });
+  for (const rel of toRemoveRules) {
+    await removeRule(cwd, rel);
     log.dim(`  移除 rule：${rel}`);
   }
 }

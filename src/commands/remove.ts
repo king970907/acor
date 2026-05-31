@@ -1,15 +1,9 @@
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import prompts from 'prompts';
 import kleur from 'kleur';
 import { log } from '../utils/logger.js';
 import { fileExists, readJsonFile, writeJsonFile } from '../utils/fs.js';
-import {
-  getAcorJsonFile,
-  getAcorDir,
-  getClaudeSkillsDir,
-  getClaudeRulesDir,
-} from '../utils/paths.js';
+import { getAcorJsonFile, getAcorDir } from '../utils/paths.js';
+import { removeSkill, removeRule } from '../utils/install.js';
 import type { AcorJson } from '../types/index.js';
 
 export interface RemoveOptions {
@@ -78,13 +72,11 @@ export async function runRemove(opts: RemoveOptions): Promise<void> {
 
   // 刪除檔案
   for (const id of removeSkills) {
-    const dest = path.join(getClaudeSkillsDir(cwd), id);
-    await fs.rm(dest, { recursive: true, force: true });
+    await removeSkill(cwd, id);
     log.dim(`  移除 skill：${id}`);
   }
   for (const rel of removeRules) {
-    const dest = path.join(getClaudeRulesDir(cwd), rel);
-    await fs.rm(dest, { force: true });
+    await removeRule(cwd, rel);
     log.dim(`  移除 rule：${rel}`);
   }
 

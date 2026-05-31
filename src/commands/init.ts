@@ -9,12 +9,10 @@ import {
   getAcorJsonFile,
   getClaudeDir,
   getClaudeSkillsDir,
-  getClaudeRulesDir,
-  getHubSkillsDir,
-  getHubRulesDir,
 } from '../utils/paths.js';
 import { loadConfig } from '../utils/config.js';
 import { syncRegistry } from '../utils/registry.js';
+import { installSkill, installRule } from '../utils/install.js';
 import type { AcorJson } from '../types/index.js';
 
 export interface InitOptions {
@@ -66,42 +64,20 @@ export async function runInit(opts: InitOptions): Promise<void> {
   log.success('ACOR 初始化完成');
 }
 
-export async function installFromAcorJson(
-  cwd: string,
-  acorJson: AcorJson,
-  hubPath: string,
-): Promise<void> {
-  const skillsDir = getHubSkillsDir(hubPath);
-  const rulesDir = getHubRulesDir(hubPath);
-
+async function installFromAcorJson(cwd: string, acorJson: AcorJson, hubPath: string): Promise<void> {
   let installed = 0;
-
   for (const id of acorJson.skills) {
-    const src = path.join(skillsDir, id, 'SKILL.md');
-    if (!await fileExists(src)) {
-      log.warn(`  找不到 skill：${id}`);
-      continue;
+    if (await installSkill(cwd, hubPath, id)) {
+      log.dim(`  安裝 skill：${id}`);
+      installed++;
     }
-    const dest = path.join(getClaudeSkillsDir(cwd), id, 'SKILL.md');
-    await ensureDir(path.dirname(dest));
-    await fs.copyFile(src, dest);
-    log.dim(`  安裝 skill：${id}`);
-    installed++;
   }
-
   for (const rel of acorJson.rules) {
-    const src = path.join(rulesDir, rel);
-    if (!await fileExists(src)) {
-      log.warn(`  找不到 rule：${rel}`);
-      continue;
+    if (await installRule(cwd, hubPath, rel)) {
+      log.dim(`  安裝 rule：${rel}`);
+      installed++;
     }
-    const dest = path.join(getClaudeRulesDir(cwd), rel);
-    await ensureDir(path.dirname(dest));
-    await fs.copyFile(src, dest);
-    log.dim(`  安裝 rule：${rel}`);
-    installed++
   }
-
   log.success(`安裝完成（${installed} 個項目）`);
 }
 
