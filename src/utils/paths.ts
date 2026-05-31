@@ -4,12 +4,27 @@ import path from 'node:path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// acor 套件內的 assets（acor-skills）
 export function getAssetsDir(): string {
   return path.resolve(__dirname, '../../assets');
 }
 
 export function getAcorSkillsAssetsDir(): string {
   return path.join(getAssetsDir(), 'acor-skills');
+}
+
+// hub 相關路徑（registry 來源）
+export function getHubSkillsDir(hubPath: string): string {
+  return path.join(hubPath, 'skills');
+}
+
+export function getHubRulesDir(hubPath: string): string {
+  return path.join(hubPath, 'rules');
+}
+
+// 專案根目錄的 acor.json（進 git）
+export function getAcorJsonFile(cwd: string): string {
+  return path.join(cwd, 'acor.json');
 }
 
 // .acor/ 目錄（runtime，不進 git）
@@ -19,27 +34,6 @@ export function getAcorDir(cwd: string): string {
 
 export function getAcorCoreDir(cwd: string): string {
   return path.join(cwd, '.acor', 'core');
-}
-
-export function getAcorArchiveDir(cwd: string): string {
-  return path.join(cwd, '.acor', 'archive');
-}
-
-// .acor/ 內的 skill / rule 庫（local copy，供 Claude 讀取）
-export function getAcorLocalSkillsDir(cwd: string): string {
-  return path.join(cwd, '.acor', 'skills');
-}
-
-export function getAcorLocalRulesDir(cwd: string): string {
-  return path.join(cwd, '.acor', 'rules');
-}
-
-export function getCatalogFile(cwd: string): string {
-  return path.join(cwd, '.acor', 'core', 'catalog.json');
-}
-
-export function getStateFile(cwd: string): string {
-  return path.join(cwd, '.acor', 'core', 'state.json');
 }
 
 export function getLastScanFile(cwd: string): string {

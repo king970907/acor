@@ -3,8 +3,9 @@ import { createRequire } from 'node:module';
 import process from 'node:process';
 import { printBanner } from './utils/banner.js';
 import { runInit } from './commands/init.js';
+import { runAdd } from './commands/add.js';
+import { runRemove } from './commands/remove.js';
 import { runList } from './commands/list.js';
-import { runRestore } from './commands/restore.js';
 import { runStatus } from './commands/status.js';
 
 const loadPkg = createRequire(import.meta.url);
@@ -24,36 +25,43 @@ program
 
 program
   .command('init')
-  .description('初始化 ACOR：建立 .acor/ 結構、同步 skill 庫、安裝 /acor-scan 與 /acor-apply')
+  .description('初始化 ACOR：建立 .acor/ 結構、安裝 /acor-scan 與 /acor-apply、安裝 acor.json 宣告的項目')
   .option('--cwd <path>', '目標專案根目錄', process.cwd())
-  .option('--force', '強制重新初始化（覆寫現有 .acor/）', false)
+  .option('--force', '強制重新安裝所有項目', false)
   .action(async (opts) => {
     await runInit({ cwd: opts.cwd, force: opts.force });
   });
 
 program
+  .command('add')
+  .description('從 hub 選擇並安裝 skills / rules 到當前專案')
+  .option('--cwd <path>', '目標專案根目錄', process.cwd())
+  .action(async (opts) => {
+    await runAdd({ cwd: opts.cwd });
+  });
+
+program
+  .command('remove')
+  .description('移除已安裝的 skills / rules')
+  .option('--cwd <path>', '目標專案根目錄', process.cwd())
+  .action(async (opts) => {
+    await runRemove({ cwd: opts.cwd });
+  });
+
+program
   .command('list')
-  .description('列出 ACOR 所有可用的 skills 與 rules，並顯示安裝狀態')
-  .option('--cwd <path>', '目標專案根目錄（用於顯示安裝狀態）', process.cwd())
+  .description('列出已安裝的 skills 與 rules')
+  .option('--cwd <path>', '目標專案根目錄', process.cwd())
   .action(async (opts) => {
     await runList({ cwd: opts.cwd });
   });
 
 program
   .command('status')
-  .description('顯示 ACOR 當前狀態：已安裝項目、上次掃描結果、封存清單')
+  .description('顯示 ACOR 當前狀態')
   .option('--cwd <path>', '目標專案根目錄', process.cwd())
   .action(async (opts) => {
     await runStatus({ cwd: opts.cwd });
-  });
-
-program
-  .command('restore')
-  .description('從 .acor/archive/ 還原封存的 skills / rules')
-  .option('--cwd <path>', '目標專案根目錄', process.cwd())
-  .option('-y, --yes', '跳過互動式提問，還原所有封存項目', false)
-  .action(async (opts) => {
-    await runRestore({ cwd: opts.cwd, yes: opts.yes });
   });
 
 program.parseAsync(process.argv).catch((err) => {

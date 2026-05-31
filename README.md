@@ -1,6 +1,6 @@
 # ACOR
 
-**AI Context Orchestration Runtime** — 分析專案、推薦適合的 skills / rules，並一鍵注入 Claude Code 的 AI 上下文管理工具。
+**AI Context Orchestration Runtime** — 管理 Claude Code 的 skills 與 rules，讓開發者自行選擇、團隊統一同步。
 
 ```
    ___   _____  ____  ____
@@ -14,38 +14,27 @@
 ## 解決的問題
 
 - 每個新專案都要手動建 `.claude/skills/` 和 `.claude/rules/`，重複費時
-- 不知道當前專案適合裝哪些 skills — 明明是 Vue + TypeScript 專案卻裝了 React 相關設定
-- 多個 rule 檔案彼此衝突（A 說 single quotes、B 說 double quotes）卻沒有人發現
-- 手動封存 / 還原 skills 很麻煩，怕刪錯
+- 團隊成員各自安裝不同的 skills，環境不一致
+- 安裝了衝突的 rules（A 說 single quotes、B 說 double quotes）沒有人發現
 
 ---
 
 ## 核心設計
 
-### CLI 只做機械操作，智能交給 Claude
-
-ACOR 的設計參考 spec-tools 的架構理念：**CLI 是搬運工，Claude 才是大腦。**
+### CLI 搬運，Claude 分析
 
 | 層級 | 工具 | 職責 |
 |------|------|------|
-| CLI（`acor`） | Node.js | 初始化目錄、同步 skill 庫、列清單、還原封存 |
-| Skills（`/acor-scan`、`/acor-apply`） | Claude 執行 | 分析專案、偵測衝突、推薦、套用 |
+| CLI（`acor`） | Node.js | 選擇 skills、安裝、移除、同步 |
+| Skills（`/acor-scan`、`/acor-apply`） | Claude 執行 | 分析衝突、處理矛盾、合併優化 |
 
-### 為什麼不在 CLI 做分析？
+### 使用者自主選擇，不靠 AI 推薦
 
-CLI 做靜態分析的天花板很低：只能讀 `package.json`、用 regex 找衝突、觸發條件硬編碼。
+開發者最了解自己的專案。ACOR 提供清單讓你選，CLI 負責安裝，不猜測你需要什麼。
 
-Claude 做分析則不同：
-- 能讀任何語言的專案（Go、Python、Rust、Java…）
-- 能理解語意衝突，不是 regex 比對
-- 推薦理由有說明，不是黑盒子分數
-- **只從 catalog 推薦**，不憑空發明 skill 名稱
+### `acor.json` 是 source of truth
 
-### 其他設計原則
-
-- **非破壞性**：從不直接刪除，封存至 `.acor/archive/`，可用 `acor restore` 還原
-- **本地優先**：`acor init` 把 skill 庫複製到 `.acor/`，Claude skill 讀本地檔案，不依賴網路
-- **Source of Truth**：`.acor/core/state.json` 追蹤 ACOR 安裝過的每一個 skill / rule
+宣告專案使用哪些 skills/rules，進 git，讓所有人 `acor init` 就能還原一致的環境。
 
 ---
 
@@ -54,21 +43,38 @@ Claude 做分析則不同：
 **需求：** Node.js >= 18.0.0
 
 ```bash
-git clone git@github.com:king970907/acor.git
+git clone git@github.com:yourorg/acor.git
 cd acor
 npm install
 npm install -g .
 
-# 確認安裝成功
+# 確認安裝
 acor --version
 ```
 
-更新到最新版：
+---
 
-```bash
-cd <acor clone 路徑>
-git pull
-npm install -g .
+## 設定 Hub（skills 來源）
+
+在 `~/.acor/config.json` 設定 hub 路徑：
+
+**本地資料夾：**
+```json
+{
+  "registry": {
+    "path": "/path/to/acor-hub"
+  }
+}
+```
+
+**Git 倉庫：**
+```json
+{
+  "registry": {
+    "url": "https://github.com/yourorg/acor-hub",
+    "branch": "main"
+  }
+}
 ```
 
 ---
@@ -76,16 +82,24 @@ npm install -g .
 ## 使用流程
 
 ```
-acor init                ← 一次性設定（建目錄 + 同步 skill 庫 + 安裝 Claude skills）
+acor init                ← 建立 .acor/ 環境，若有 acor.json 自動安裝
+     ↓
+acor add                 ← 互動式選擇 skills 和 rules，產生 acor.json
+     ↓
+git commit acor.json     ← 讓團隊同步
      ↓
 在 Claude Code 中：
-/acor-scan               ← Claude 分析專案、偵測衝突、推薦 skills / rules
+/acor-scan               ← 分析已安裝項目是否有衝突
      ↓
-/acor-apply              ← Claude 互動選擇，確認後套用到 .claude/
-/acor-apply all          ← 快速模式：跳過所有詢問，直接套用高信心推薦
+/acor-apply              ← 處理衝突，修改或合併
 ```
 
-之後若有新增 skills 或更新 ACOR，重新執行 `acor init --force` 即可。
+### 團隊成員加入
+
+```bash
+git clone <your-project>
+acor init                ← 讀 acor.json，一鍵還原所有 skills/rules
+```
 
 ---
 
@@ -93,236 +107,123 @@ acor init                ← 一次性設定（建目錄 + 同步 skill 庫 + �
 
 ### `acor init`
 
-初始化 ACOR，執行以下步驟：
-
-1. 建立 `.acor/` 目錄結構
-2. 將 ACOR 的 skill / rule 庫複製到 `.acor/skills/` 和 `.acor/rules/`（供 Claude 本地讀取）
-3. 產生 `.acor/core/catalog.json`（skills / rules 清單，`/acor-scan` 的推薦來源）
-4. 安裝 `/acor-scan` 和 `/acor-apply` 到 `.claude/skills/`
+建立 `.acor/` 目錄結構、安裝 `/acor-scan` 與 `/acor-apply`。
+若 `acor.json` 已存在，自動安裝宣告的 skills/rules。
 
 ```bash
 acor init
-acor init --cwd /path/to/project
-acor init --force   # 強制重新初始化（更新 skill 庫後使用）
+acor init --force        # 強制重新安裝所有項目
 ```
 
-初始化後的 `.acor/` 結構：
+### `acor add`
 
-```
-.acor/                     ← 不進 git（自動加入 .gitignore）
-  core/
-    catalog.json           # skills / rules 清單（/acor-scan 的推薦來源）
-    state.json             # 追蹤 ACOR 安裝的 skills / rules
-    last-scan.json         # /acor-scan 的掃描結果快取
-  skills/                  # skill 庫本地副本
-    typescript-strict/
-    vue-patterns/
-    ...
-  rules/                   # rule 庫本地副本
-    typescript.md
-    ...
-  archive/                 # 封存的舊 skills / rules
+從 hub 互動式選擇 skills 和 rules：
+
+```bash
+acor add
 ```
 
----
+```
+? Skills
+  ◉ TypeScript Strict Mode    TypeScript strict mode 最佳實踐
+  ◯ Vue / Nuxt Patterns       Vue 3 Composition API...
+  ◯ React / Next.js Patterns  React 18+ App Router...
+  ...
+
+? Rules
+  ◉ TypeScript 慣例
+  ◯ 測試規範
+  ...
+
+確認套用？ › 是
+```
+
+已安裝的項目預先勾選，可直接新增或取消勾選來移除。
+完成後更新 `acor.json`。
+
+### `acor remove`
+
+互動式移除已安裝的 skills/rules：
+
+```bash
+acor remove
+```
 
 ### `acor list`
 
-列出 ACOR 所有可用的 skills 與 rules，並顯示當前專案的安裝狀態。
-
-```bash
-acor list
-acor list --cwd /path/to/project
-```
-
-範例輸出：
-
-```
-可用 Skills（5）
-  ✔ TypeScript Strict Mode    TypeScript strict mode 最佳實踐      [typescript, type-safety]
-  ✔ Vue / Nuxt Patterns       Vue 3 Composition API 與 Nuxt 4...   [vue, nuxt, frontend]
-  ○ React / Next.js Patterns  React 18+ 與 Next.js App Router...   [react, nextjs, frontend]
-
-可用 Rules（3）
-  ✔ TypeScript 慣例            TypeScript strict mode 程式碼慣例...
-  ○ 測試規範                   單元測試與整合測試撰寢原則，框架無關
-  ○ Node.js 安全規範           Node.js 後端 API 安全實踐...
-```
-
-`✔` 表示已由 ACOR 安裝，`○` 表示未安裝。需先執行 `acor init` 才能使用。
-
----
+列出 `acor.json` 中所有已安裝的 skills 和 rules。
 
 ### `acor status`
 
-顯示當前專案的 ACOR 狀態：已安裝項目、上次掃描摘要、封存清單。
-
-```bash
-acor status
-acor status --cwd /path/to/project
-```
-
-範例輸出：
-
-```
-ACOR 狀態
-  專案：/path/to/my-project
-
-已安裝（2 skills，2 rules）
-  Skills：typescript-strict, vue-patterns
-  Rules： typescript.md, testing.md
-
-上次掃描
-  時間：05/29 21:34（2 小時前）
-  專案：typescript / nuxt / web，含測試
-  衝突：無
-  推薦：1 項（1 高信心）
-
-封存
-  （無）
-```
-
----
-
-### `acor restore`
-
-從 `.acor/archive/` 還原封存的 skills 或 rules（由 `/acor-apply` 封存的項目）。
-
-```bash
-acor restore
-acor restore -y     # 還原所有封存項目
-```
+顯示目前狀態：已安裝項目、上次 scan 時間與衝突數。
 
 ---
 
 ## Claude Skills
 
-`acor init` 會將以下兩個 skill 安裝到 `.claude/skills/`，之後直接在 Claude Code 中呼叫。
+`acor init` 會將以下兩個 skill 安裝到 `.claude/skills/`：
 
 ### `/acor-scan`
 
-Claude 執行的專案掃描與推薦 skill，設計重點：
+分析已安裝的所有 skills/rules，找出衝突與矛盾：
+- 縮排設定不一致
+- 引號規範衝突
+- 框架 patterns 重複安裝（如 vue + react）
+- 任何語意上的矛盾規定
 
-**分層讀取，token 節省：**
-
-```
-Phase 1（必跑）：catalog.json + 語言特徵檔 + 現有 .claude/ 清單
-  ✅ 語言和框架已確定 → 直接跳 Phase 4
-
-Phase 2（Phase 1 不確定才讀）：tsconfig / vite.config / nuxt.config…
-  ✅ 已有足夠資訊 → 跳 Phase 4
-
-Phase 3（Phase 2 仍不確定才讀）：原始碼抽樣，最多 2 個檔案 × 前 40 行
-
-Phase 4：分析 + 推薦（只從 catalog 選，每個推薦附具體證據）
-
-Phase 5：輸出結果 + 寫入 .acor/core/last-scan.json
-```
-
-**多語言支援：** Phase 1 同時檢查 `package.json`、`go.mod`、`Cargo.toml`、`pyproject.toml`、`pom.xml`、`Package.swift` 等，不限 Node.js 專案。
-
-**證據驅動：** 每個推薦必須列出具體依據，信心不足時詢問使用者而非猜測。
-
-**高信心 vs 低信心：**
-- 高信心：命中 2 個以上明確 trigger（如 `package.json` 包含 `vue` + devDeps 有 `typescript`）
-- 低信心：只命中 1 個 trigger，會在清單中標示供使用者判斷
-
----
+結果寫入 `.acor/core/last-scan.json`，供 `/acor-apply` 使用。
 
 ### `/acor-apply`
 
-Claude 執行的互動式套用 skill：
-
-1. 讀取 `/acor-scan` 產生的 `last-scan.json`（超過 30 分鐘提示重新 scan）
-2. 顯示衝突警告，讓使用者決定是否繼續
-3. 互動選擇要套用的 skills / rules（AskUserQuestion UI）
-4. 互動選擇要封存的現有項目
-5. **確認摘要後才寫入任何檔案**
-6. 寫入 `.claude/`、執行封存、更新 `state.json`
-
-**互動次數對照：**
-
-| 情境 | 互動次數 |
-|------|---------|
-| `/acor-apply all` | 0 次（全自動，套用所有高信心推薦） |
-| 選「套用高信心推薦」+ 無封存建議 | 2 次 |
-| 選「套用高信心推薦」+ 有封存建議 | 3 次 |
-| 手動選擇 skills + rules + 封存 | 最多 5 次 |
+讀取 scan 結果，逐一處理衝突：
+- 修改衝突的規則內容
+- 合併重複的規範
+- 移除有衝突的項目
+- 所有修改需使用者確認後才執行
 
 ---
 
-## 內建 Skills
+## Hub 結構（`acor-hub/`）
 
-| ID | 名稱 | 觸發條件 |
-|----|------|----------|
-| `typescript-strict` | TypeScript Strict Mode | `language: typescript` / `devDep: typescript` |
-| `vue-patterns` | Vue / Nuxt Patterns | `framework: vue/nuxt` / `dep: vue` |
-| `react-patterns` | React / Next.js Patterns | `framework: react/next` / `dep: react` |
-| `testing-vitest` | Testing with Vitest | `devDep: vitest` |
-| `node-api` | Node.js API Patterns | `framework: express/fastify/hono` |
-| `python-patterns` | Python Patterns | `language: python` / `file: pyproject.toml` |
-| `go-patterns` | Go Patterns | `language: go` / `file: go.mod` |
-| `rust-patterns` | Rust Patterns | `language: rust` / `file: Cargo.toml` |
-| `java-spring` | Java / Spring Boot Patterns | `language: java` / `file: pom.xml` |
-
-## 內建 Rules
-
-| ID | 名稱 | 觸發條件 |
-|----|------|----------|
-| `typescript` | TypeScript 慣例 | `language: typescript` |
-| `testing` | 測試規範 | `devDep: vitest / jest` |
-| `node-security` | Node.js 安全規範 | `projectType: api` / `framework: express/fastify/hono` |
-| `python` | Python 慣例 | `language: python` |
-| `go` | Go 慣例 | `language: go` |
-
----
-
-## 新增自訂 Skill / Rule
-
-**新增 skill：**
-
-1. 建立 `assets/skills/<id>/SKILL.md`：
-
-```markdown
----
-id: my-skill
-name: My Skill
-description: 簡短說明
-version: 1.0.0
-tags: [tag1, tag2]
-triggers:
-  - type: framework
-    value: vue
-  - type: devDependency
-    value: typescript
----
-
-# Skill 內文（給 Claude 的指引）
-...
+```
+acor-hub/
+  skills/
+    typescript-strict/
+      SKILL.md
+    vue-patterns/
+      SKILL.md
+    ...
+  rules/
+    typescript.md
+    testing.md
+    ...
 ```
 
-2. 重新安裝並在目標專案重新初始化：
+新增 skill：建立 `skills/<id>/SKILL.md`，填寫 frontmatter（id / name / description / version / tags / triggers）。
 
-```bash
-npm run build && npm install -g .
-acor init --force --cwd /your/project
+新增 rule：建立 `rules/<name>.md`，填寫 frontmatter。
+
+修改後執行 `acor add` 即可看到新項目（動態讀取，不需要重建索引）。
+
+---
+
+## `acor.json` 格式
+
+```json
+{
+  "version": "1.0.0",
+  "skills": [
+    "typescript-strict",
+    "vue-patterns"
+  ],
+  "rules": [
+    "typescript.md",
+    "testing.md"
+  ]
+}
 ```
 
-**新增 rule：**
-
-1. 建立 `assets/rules/<name>.md`（frontmatter 格式同上，`triggers` 可省略表示通用規則）
-2. 同上重新安裝
-
-**可用的 trigger 類型：**
-
-| type | 說明 | 範例值 |
-|------|------|--------|
-| `framework` | 偵測到的框架 | `vue`, `nuxt`, `react`, `next`, `express` |
-| `dependency` | `dependencies` 中包含 | `vue`, `react` |
-| `devDependency` | `devDependencies` 中包含 | `typescript`, `vitest` |
-| `language` | 偵測到的語言 | `typescript`, `javascript`, `go`, `python` |
-| `projectType` | 偵測到的專案類型 | `web`, `api`, `cli`, `library` |
-| `file` | 偵測到特定設定檔 | `vitest.config`, `tailwind.config` |
+進 git，是團隊環境的 source of truth。
 
 ---
 
@@ -331,27 +232,23 @@ acor init --force --cwd /your/project
 ```
 acor/
   src/
-    cli.ts                  # Commander 入口（init / list / status / restore）
+    cli.ts                    # 指令入口
     commands/
-      init.ts               # 同步 skill 庫、產生 catalog、安裝 ACOR skills
-      list.ts               # 讀 catalog.json 顯示清單與安裝狀態
-      status.ts             # 顯示已安裝項目、掃描結果、封存清單
-      restore.ts            # 從 .acor/archive/ 還原封存項目
-    core/
-      state.ts              # state.json 讀寫
-    types/
-      index.ts              # 共用型別（Catalog、AcorState…）
+      init.ts                 # 建立環境、安裝 acor.json 宣告的項目
+      add.ts                  # 互動式選擇並安裝 skills/rules
+      remove.ts               # 移除已安裝項目
+      list.ts                 # 列出已安裝清單
+      status.ts               # 顯示狀態
     utils/
+      config.ts               # ~/.acor/config.json 讀寫
+      registry.ts             # hub 同步（本地路徑或 git clone）
       logger.ts / fs.ts / paths.ts / banner.ts
   assets/
-    skills/                 # 內建 coding skills（每個子目錄一個 SKILL.md）
-    rules/                  # 內建 rules（.md 檔案）
-    acor-skills/            # ACOR 工具 skills（由 Claude 執行）
-      acor-scan/SKILL.md    # /acor-scan：分析 + 推薦
-      acor-apply/SKILL.md   # /acor-apply：互動套用
+    acor-skills/
+      acor-scan/SKILL.md      # /acor-scan：衝突分析
+      acor-apply/SKILL.md     # /acor-apply：衝突處理
   bin/
-    acor.js                 # CLI 入口
-  dist/                     # TypeScript 編譯輸出（不進 git）
+    acor.js
 ```
 
 ---
@@ -359,9 +256,8 @@ acor/
 ## 開發
 
 ```bash
-npm run build        # 編譯 TypeScript → dist/
+npm run build        # 編譯 TypeScript
 npm run dev          # tsc --watch
-node bin/acor.js     # 本地執行
 npm install -g .     # 重新安裝全域
 ```
 

@@ -3,47 +3,40 @@ export interface SkillTrigger {
   value: string
 }
 
-export interface CatalogSkill {
+// acor.json（進 git，宣告專案使用哪些 skills / rules）
+export interface AcorJson {
+  version: string
+  skills: string[]
+  rules: string[]
+}
+
+// hub 中每個 skill 的 metadata（acor add 顯示清單用）
+export interface HubSkill {
   id: string
   name: string
   description: string
   version: string
   tags: string[]
   triggers: SkillTrigger[]
-  sourcePath: string
 }
 
-export interface CatalogRule {
+// hub 中每個 rule 的 metadata
+export interface HubRule {
   id: string
   name: string
   description: string
   triggers: SkillTrigger[]
   relativePath: string
-  sourcePath: string
 }
 
-export interface Catalog {
-  version: string
-  generatedAt: string
-  skills: CatalogSkill[]
-  rules: CatalogRule[]
-}
-
-export interface AcorState {
-  version: string
-  installedSkills: string[]
-  installedRules: string[]
-  archivedAt: Record<string, string>
-}
-
+// /acor-scan 的結果快取
 export interface LastScan {
   scannedAt: string
-  project: {
-    language: string
-    framework: string
-    projectType: string
-    hasTesting: boolean
-  }
-  conflicts: Array<{ description: string; items: string[] }>
-  recommendations: Array<{ type: string; id: string; confidence: string }>
+  installedSkills: string[]
+  installedRules: string[]
+  conflicts: Array<{
+    type: 'skill' | 'rule' | 'cross'
+    description: string
+    items: string[]
+  }>
 }
